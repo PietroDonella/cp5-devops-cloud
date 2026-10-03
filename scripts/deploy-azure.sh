@@ -16,7 +16,7 @@ for tool in git az dotnet zip; do
 done
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-API_REPO_URL="${API_REPO_URL:-https://github.com/EnzoVazz/StellarGear.API.git}"
+API_REPO_URL="${API_REPO_URL:-https://github.com/PietroDonella/StellarGear.API.git}"
 API_BRANCH="${API_BRANCH:-cp6-azure}"
 APP="$REPO/.api"
 PUBLISH="$REPO/publish"

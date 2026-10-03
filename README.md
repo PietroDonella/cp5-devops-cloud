@@ -14,10 +14,10 @@ Uma API .NET 10 sobe no Azure App Service, grava os dados em um Azure SQL Databa
 
 O script de deploy **clona a API durante a execução**. O código da aplicação mora no repositório abaixo e não é versionado aqui:
 
-- Repositório: <https://github.com/EnzoVazz/StellarGear.API>
+- Repositório: <https://github.com/PietroDonella/StellarGear.API> (fork de [`EnzoVazz/StellarGear.API`](https://github.com/EnzoVazz/StellarGear.API))
 - Branch usada no deploy: **`cp6-azure`**
 
-A branch `cp6-azure` é a adaptação da API para a nuvem: provider Oracle trocado por SQL Server, migração `InitialSqlServer`, Application Insights ligado e Swagger exposto em produção.
+A branch `cp6-azure` é a adaptação da API para a nuvem: provider Oracle trocado por SQL Server, migração `InitialSqlServer`, Application Insights ligado e Swagger exposto em produção. A `main` continua igual à do repositório original.
 
 ## O que tem neste repositório
 
@@ -30,7 +30,7 @@ A branch `cp6-azure` é a adaptação da API para a nuvem: provider Oracle troca
 | Consultas para mostrar a persistência depois de cada operação | [`database/verificar-persistencia.sql`](database/verificar-persistencia.sql) |
 | JSON das operações GET, POST, PUT e DELETE | [`api/operacoes-crud.json`](api/operacoes-crud.json) |
 | How to da implantação | este arquivo |
-| Código fonte da aplicação | clonado de [`EnzoVazz/StellarGear.API`, branch `cp6-azure`](https://github.com/EnzoVazz/StellarGear.API/tree/cp6-azure) |
+| Código fonte da aplicação | clonado de [`PietroDonella/StellarGear.API`, branch `cp6-azure`](https://github.com/PietroDonella/StellarGear.API/tree/cp6-azure) |
 
 ## Recursos criados na Azure
 

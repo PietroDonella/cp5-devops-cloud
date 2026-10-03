@@ -28,7 +28,7 @@ function Remove-Tree($path) {
 }
 
 $repo = Split-Path -Parent $PSScriptRoot
-$apiUrl = if ($env:API_REPO_URL) { $env:API_REPO_URL } else { "https://github.com/EnzoVazz/StellarGear.API.git" }
+$apiUrl = if ($env:API_REPO_URL) { $env:API_REPO_URL } else { "https://github.com/PietroDonella/StellarGear.API.git" }
 $apiBranch = if ($env:API_BRANCH) { $env:API_BRANCH } else { "cp6-azure" }
 $app = Join-Path $repo ".api"
 $publish = Join-Path $repo "publish"
