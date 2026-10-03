@@ -40,7 +40,7 @@ A branch `cp6-azure` é a adaptação da API para a nuvem: provider Oracle troca
 
 ## Recursos criados na Azure
 
-Todos no grupo `rg-stellargear-cp6`, região `brazilsouth`. Os nomes levam um sufixo com data e número aleatório para não colidir com recursos de outros grupos.
+Todos no grupo `rg-stellargear-cp6`, região `brazilsouth`. Os nomes levam um sufixo com data e número aleatório.
 
 | Recurso | Nome | Observação |
 |---|---|---|
@@ -129,7 +129,7 @@ Na primeira requisição a aplicação roda `Database.Migrate()` e cria as tabel
 
 ### 5. Criar as tabelas manualmente (opcional)
 
-Se preferir mostrar o DDL rodando antes da aplicação, abra o banco `StellarGearDb` no portal, vá em **Query editor (preview)**, entre com `stellaradmin` e a senha, e execute [`database/ddl-stellargear.sql`](database/ddl-stellargear.sql). O script é idempotente: não recria o que já existe, e insere a linha correspondente em `__EFMigrationsHistory` para a migração do EF não tentar criar tudo de novo.
+Se preferir mostrar o DDL rodando antes da aplicação, abra o banco `StellarGearDb` no portal, vá em **Query editor (preview)**, entre com `stellaradmin` e a senha, e execute [`database/ddl-stellargear.sql`](database/ddl-stellargear.sql). O script não recria o que já existe, e insere a linha correspondente em `__EFMigrationsHistory` para a migração do EF não tentar criar tudo de novo.
 
 ## Banco de dados
 
