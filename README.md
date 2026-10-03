@@ -2,6 +2,12 @@
 
 DevOps Tools & Cloud Computing — turma **2TDSPF**.
 
+> ### ⚠️ Onde está o código fonte da aplicação
+>
+> **O código fonte completo da API está em [`PietroDonella/StellarGear.API`, branch `cp6-azure`](https://github.com/PietroDonella/StellarGear.API/tree/cp6-azure)** — repositório público, aberto para avaliação.
+>
+> Ele não é duplicado aqui de propósito. A API é um projeto próprio do grupo, com histórico de commits independente, e este repositório é a camada de infraestrutura do checkpoint: os scripts de Azure CLI, o DDL, o JSON das operações e o how to. O script de deploy **clona a API automaticamente durante a execução**, então um único comando entrega a aplicação inteira na nuvem sem nenhum passo manual.
+
 | Integrante | RM |
 |---|---|
 | Enzo Vaz | 561702 |
@@ -30,7 +36,7 @@ A branch `cp6-azure` é a adaptação da API para a nuvem: provider Oracle troca
 | Consultas para mostrar a persistência depois de cada operação | [`database/verificar-persistencia.sql`](database/verificar-persistencia.sql) |
 | JSON das operações GET, POST, PUT e DELETE | [`api/operacoes-crud.json`](api/operacoes-crud.json) |
 | How to da implantação | este arquivo |
-| Código fonte da aplicação | clonado de [`PietroDonella/StellarGear.API`, branch `cp6-azure`](https://github.com/PietroDonella/StellarGear.API/tree/cp6-azure) |
+| **Código fonte da aplicação completa** | **[`PietroDonella/StellarGear.API`, branch `cp6-azure`](https://github.com/PietroDonella/StellarGear.API/tree/cp6-azure)** — clonado pelo script durante o deploy |
 
 ## Recursos criados na Azure
 
