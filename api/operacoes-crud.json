@@ -1,0 +1,133 @@
+{
+  "baseUrl": "https://NOME_DO_WEBAPP.azurewebsites.net",
+  "swagger": "https://NOME_DO_WEBAPP.azurewebsites.net/swagger",
+  "masterDetail": {
+    "master": "passageiro /api/Passageiro",
+    "detail": "traje /api/Traje",
+    "foreignKey": "traje.id_passageiro -> passageiro.id_passageiro"
+  },
+  "passageiro": {
+    "GET_lista": { "method": "GET", "url": "/api/Passageiro" },
+    "GET_por_id": { "method": "GET", "url": "/api/Passageiro/1" },
+    "POST": {
+      "method": "POST",
+      "url": "/api/Passageiro",
+      "status": 201,
+      "body": {
+        "nome": "Elon Musk",
+        "cpf": "12345678900",
+        "idade": 54,
+        "statusMedico": "Apto para Voo"
+      },
+      "response": {
+        "id": 1,
+        "nome": "Elon Musk",
+        "cpf": "12345678900",
+        "idade": 54,
+        "statusMedico": "Apto para Voo"
+      }
+    },
+    "PUT": {
+      "method": "PUT",
+      "url": "/api/Passageiro/1",
+      "status": 204,
+      "body": {
+        "nome": "Elon Musk",
+        "cpf": "12345678900",
+        "idade": 55,
+        "statusMedico": "Apto para Voo"
+      }
+    },
+    "DELETE": { "method": "DELETE", "url": "/api/Passageiro/1", "status": 204 }
+  },
+  "traje": {
+    "GET_lista": { "method": "GET", "url": "/api/Traje" },
+    "GET_por_id": { "method": "GET", "url": "/api/Traje/1" },
+    "POST": {
+      "method": "POST",
+      "url": "/api/Traje",
+      "status": 201,
+      "body": {
+        "idPassageiro": 1,
+        "codigoRfid": "RFID-SG-001"
+      }
+    },
+    "PUT": {
+      "method": "PUT",
+      "url": "/api/Traje/1",
+      "status": 204,
+      "body": {
+        "idPassageiro": 1,
+        "codigoRfid": "RFID-SG-002"
+      }
+    },
+    "DELETE": { "method": "DELETE", "url": "/api/Traje/1", "status": 204 }
+  },
+  "medico": {
+    "GET": { "method": "GET", "url": "/api/Medico" },
+    "POST": {
+      "method": "POST",
+      "url": "/api/Medico",
+      "body": { "nome": "Dra. Ana Lima", "crm": "CRM-12345", "especialidade": "Medicina Aeroespacial" }
+    },
+    "PUT": {
+      "method": "PUT",
+      "url": "/api/Medico/1",
+      "body": { "nome": "Dra. Ana Lima", "crm": "CRM-12345", "especialidade": "Cardiologia" }
+    },
+    "DELETE": { "method": "DELETE", "url": "/api/Medico/1" }
+  },
+  "leituraSensor": {
+    "GET": { "method": "GET", "url": "/api/LeituraSensor" },
+    "POST": {
+      "method": "POST",
+      "url": "/api/LeituraSensor",
+      "body": { "idTraje": 1, "temperatura": 36.8, "humidade": 45.0, "batimentos": 78 }
+    },
+    "PUT": {
+      "method": "PUT",
+      "url": "/api/LeituraSensor/1",
+      "body": { "idTraje": 1, "temperatura": 37.2, "humidade": 50.0, "batimentos": 90 }
+    },
+    "DELETE": { "method": "DELETE", "url": "/api/LeituraSensor/1" }
+  },
+  "historicoMedico": {
+    "GET": { "method": "GET", "url": "/api/HistoricoMedico" },
+    "POST": {
+      "method": "POST",
+      "url": "/api/HistoricoMedico",
+      "body": { "idPassageiro": 1, "diagnostico": "Apto apos avaliacao pre-voo" }
+    },
+    "PUT": {
+      "method": "PUT",
+      "url": "/api/HistoricoMedico/1",
+      "body": { "idPassageiro": 1, "diagnostico": "Reavaliado, segue apto" }
+    },
+    "DELETE": { "method": "DELETE", "url": "/api/HistoricoMedico/1" }
+  },
+  "alertaEmergencia": {
+    "GET": { "method": "GET", "url": "/api/AlertaEmergencia" },
+    "POST": {
+      "method": "POST",
+      "url": "/api/AlertaEmergencia",
+      "body": {
+        "idLeitura": 1,
+        "idMedico": 1,
+        "descricao": "Batimentos acima do limite",
+        "nivelGravidade": "ALTO"
+      }
+    },
+    "PUT": {
+      "method": "PUT",
+      "url": "/api/AlertaEmergencia/1",
+      "body": {
+        "idLeitura": 1,
+        "idMedico": 1,
+        "descricao": "Batimentos monitorados",
+        "nivelGravidade": "MEDIO"
+      }
+    },
+    "PATCH_resolver": { "method": "PATCH", "url": "/api/AlertaEmergencia/1/resolver", "status": 204 },
+    "DELETE": { "method": "DELETE", "url": "/api/AlertaEmergencia/1" }
+  }
+}

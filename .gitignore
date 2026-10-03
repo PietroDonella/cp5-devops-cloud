@@ -1,0 +1,7 @@
+# Clone da API feito pelo script de deploy
+.api/
+
+# Artefatos do dotnet publish e do deploy
+publish/
+*.zip
+deploy-output.txt
