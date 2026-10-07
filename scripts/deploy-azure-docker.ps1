@@ -92,6 +92,7 @@ if ($LASTEXITCODE -ne 0) {
     if ($LASTEXITCODE -ne 0) { throw "az login falhou." }
 }
 
+az extension add -n application-insights
 $extension = az extension show --name application-insights --query name -o tsv 2>$null
 if (-not $extension) { Invoke-Az extension add --name application-insights }
 
