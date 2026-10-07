@@ -62,6 +62,7 @@ if (-not (Test-Path $dockerfile)) { throw "Nao achei o Dockerfile no repositorio
 az account show --query name -o tsv | Out-Null
 if ($LASTEXITCODE -ne 0) { az login }
 
+az extension add -n application-insights
 $extension = az extension show --name application-insights --query name -o tsv 2>$null
 if (-not $extension) { Invoke-Az extension add --name application-insights }
 
