@@ -3,6 +3,10 @@
 #
 #   $env:SQL_PASSWORD = "StellarGear.Cp6.2026"
 #   .\scripts\deploy-azure.ps1
+#
+# O script verifica se o .NET SDK exigido pela API esta instalado. Se nao
+# estiver, instala no diretorio do usuario com o dotnet-install oficial
+# (sem precisar de administrador). Se ja estiver, pula a instalacao.
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
@@ -27,12 +31,90 @@ function Remove-Tree($path) {
     Remove-Item $path -Recurse -Force
 }
 
+# Retorna a primeira versao de SDK instalada com o major pedido, ou $null.
+function Get-InstalledDotnetSdk([int]$major) {
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { return $null }
+    $sdks = & dotnet --list-sdks 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $sdks) { return $null }
+    foreach ($line in $sdks) {
+        $version = ($line -split '\s+')[0]
+        if ($version -like "$major.*") { return $version }
+    }
+    return $null
+}
+
+# Garante que o SDK .NET $major.x esteja no PATH. Instala em $installDir
+# se nao encontrar; se ja existir, apenas informa e segue.
+function Ensure-DotnetSdk([int]$major, [string]$installDir) {
+    $pathSep = [IO.Path]::PathSeparator
+
+    # Uma instalacao anterior em $installDir pode existir mas estar fora do
+    # PATH desta sessao. Coloca na frente para ter prioridade sobre o SDK global.
+    $userDotnet = Join-Path $installDir $(if ($IsWindows -or $env:OS -eq "Windows_NT") { "dotnet.exe" } else { "dotnet" })
+    if (Test-Path $userDotnet) {
+        $env:DOTNET_ROOT = $installDir
+        $env:PATH = "$installDir$pathSep$env:PATH"
+    }
+
+    $found = Get-InstalledDotnetSdk $major
+    if ($found) {
+        Write-Host ".NET SDK $major.x ja disponivel ($found). Pulando instalacao." -ForegroundColor Green
+        return
+    }
+
+    Write-Host ".NET SDK $major.x nao encontrado. SDKs atuais:" -ForegroundColor Yellow
+    if (Get-Command dotnet -ErrorAction SilentlyContinue) { & dotnet --list-sdks } else { Write-Host "  (dotnet nao esta no PATH)" }
+    Write-Host "Instalando .NET SDK $major.0 em $installDir (sem administrador)..."
+
+    $isWin = $IsWindows -or $env:OS -eq "Windows_NT"
+    if ($isWin) {
+        $installer = Join-Path ([IO.Path]::GetTempPath()) "dotnet-install.ps1"
+        Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile $installer -UseBasicParsing
+        & $installer -Channel "$major.0" -InstallDir $installDir
+    } else {
+        $installer = Join-Path ([IO.Path]::GetTempPath()) "dotnet-install.sh"
+        Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.sh" -OutFile $installer -UseBasicParsing
+        & bash $installer --channel "$major.0" --install-dir $installDir
+        if ($LASTEXITCODE -ne 0) { throw "dotnet-install.sh falhou (exit $LASTEXITCODE)." }
+    }
+    Remove-Item $installer -Force -ErrorAction SilentlyContinue
+
+    $env:DOTNET_ROOT = $installDir
+    $env:PATH = "$installDir$pathSep$env:PATH"
+
+    $found = Get-InstalledDotnetSdk $major
+    if (-not $found) {
+        throw "A instalacao terminou mas 'dotnet --list-sdks' ainda nao mostra $major.x."
+    }
+    Write-Host ".NET SDK instalado: $found" -ForegroundColor Green
+
+    # Deixa pronto para as proximas sessoes (so adiciona uma vez).
+    if ($isWin) {
+        $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        if ($userPath -notlike "*$installDir*") {
+            [Environment]::SetEnvironmentVariable("DOTNET_ROOT", $installDir, "User")
+            [Environment]::SetEnvironmentVariable("PATH", "$installDir;$userPath", "User")
+            Write-Host "PATH do usuario atualizado. Novos terminais ja enxergam o SDK."
+        }
+    } else {
+        $bashrc = Join-Path $HOME ".bashrc"
+        if ((Test-Path $bashrc) -and -not (Select-String -Path $bashrc -Pattern 'DOTNET_ROOT=' -Quiet)) {
+            Add-Content $bashrc "`n# .NET SDK instalado pelo deploy-azure.ps1`nexport DOTNET_ROOT=`"$installDir`"`nexport PATH=`"`$DOTNET_ROOT:`$PATH`""
+        }
+    }
+}
+
 $repo = Split-Path -Parent $PSScriptRoot
 $apiUrl = if ($env:API_REPO_URL) { $env:API_REPO_URL } else { "https://github.com/PietroDonella/StellarGear.API.git" }
 $apiBranch = if ($env:API_BRANCH) { $env:API_BRANCH } else { "cp6-azure" }
 $app = Join-Path $repo ".api"
 $publish = Join-Path $repo "publish"
 $zip = Join-Path $repo "stellargear.zip"
+
+# Versao major do .NET exigida. Por padrao e lida do TargetFramework do csproj
+# (net10.0 -> 10); pode ser forcada com $env:DOTNET_MAJOR = "10".
+$dotnetMajor = if ($env:DOTNET_MAJOR) { [int]$env:DOTNET_MAJOR } else { $null }
+$dotnetUserDir = if ($env:DOTNET_USER_DIR) { $env:DOTNET_USER_DIR } else { Join-Path $HOME ".dotnet" }
 
 $suffix = (Get-Date -Format "ddHHmmss") + (Get-Random -Maximum 9999).ToString("0000")
 $location = "brazilsouth"
@@ -45,7 +127,7 @@ $sqlUser = "stellaradmin"
 $appInsights = "appi-stellargear-$suffix"
 $sqlPassword = $env:SQL_PASSWORD
 
-foreach ($tool in @("git", "az", "dotnet")) {
+foreach ($tool in @("git", "az")) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
         throw "'$tool' nao foi encontrado no PATH. Instale antes de rodar o script."
     }
@@ -56,8 +138,16 @@ Remove-Tree $app
 git clone --branch $apiBranch --depth 1 $apiUrl $app
 if ($LASTEXITCODE -ne 0) { throw "git clone falhou." }
 
-$csproj = Join-Path $app "StellarGear.API\StellarGear.API.csproj"
+$csproj = Join-Path $app "StellarGear.API/StellarGear.API.csproj"
 if (-not (Test-Path $csproj)) { throw "Nao achei $csproj no repositorio clonado." }
+
+if (-not $dotnetMajor) {
+    $match = Select-String -Path $csproj -Pattern '<TargetFramework>net(\d+)' | Select-Object -First 1
+    $dotnetMajor = if ($match) { [int]$match.Matches[0].Groups[1].Value } else { 10 }
+}
+
+Write-Host "Verificando .NET SDK $dotnetMajor.x"
+Ensure-DotnetSdk $dotnetMajor $dotnetUserDir
 
 Write-Host "Conferindo login do Azure CLI..."
 az account show --query name -o tsv | Out-Null
@@ -120,7 +210,7 @@ if ($LASTEXITCODE -ne 0 -or -not $insightsConnection) {
     throw "Nao foi possivel ler a connection string do Application Insights."
 }
 
-Write-Host "App Service Linux (.NET 10)"
+Write-Host "App Service Linux (.NET $dotnetMajor)"
 Invoke-Az appservice plan create `
     --resource-group $resourceGroup `
     --name $plan `
@@ -132,7 +222,7 @@ Invoke-Az webapp create `
     --resource-group $resourceGroup `
     --plan $plan `
     --name $webApp `
-    --runtime "DOTNETCORE:10.0"
+    --runtime "DOTNETCORE:$dotnetMajor.0"
 
 $sqlConnection = "Server=tcp:$sqlServer.database.windows.net,1433;Initial Catalog=$sqlDatabase;Persist Security Info=False;User ID=${sqlUser};Password=${sqlPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
 

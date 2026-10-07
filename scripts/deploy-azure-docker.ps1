@@ -2,6 +2,10 @@
 # e aponta o Web App para ela. Use se DOTNETCORE:10.0 nao aparecer em
 # `az webapp list-runtimes --os-type linux`.
 #
+# Nao precisa de .NET SDK local: o build acontece dentro do ACR (`az acr build`)
+# com a imagem mcr.microsoft.com/dotnet/sdk do Dockerfile. O script apenas
+# confere se a versao do SDK no Dockerfile bate com o TargetFramework do csproj.
+#
 #   $env:SQL_PASSWORD = "StellarGear.Cp6.2026"
 #   .\scripts\deploy-azure-docker.ps1
 
@@ -59,8 +63,34 @@ if ($LASTEXITCODE -ne 0) { throw "git clone falhou." }
 $dockerfile = Join-Path $app "Dockerfile"
 if (-not (Test-Path $dockerfile)) { throw "Nao achei o Dockerfile no repositorio clonado." }
 
+# Versao major do .NET exigida pela API (net10.0 -> 10). Pode ser forcada com
+# $env:DOTNET_MAJOR = "10". Usada so para validar o Dockerfile: o build roda no ACR.
+$csproj = Join-Path $app "StellarGear.API/StellarGear.API.csproj"
+$dotnetMajor = if ($env:DOTNET_MAJOR) { [int]$env:DOTNET_MAJOR } else { $null }
+if (-not $dotnetMajor -and (Test-Path $csproj)) {
+    $match = Select-String -Path $csproj -Pattern '<TargetFramework>net(\d+)' | Select-Object -First 1
+    if ($match) { $dotnetMajor = [int]$match.Matches[0].Groups[1].Value }
+}
+if (-not $dotnetMajor) { $dotnetMajor = 10 }
+
+$sdkImage = Select-String -Path $dockerfile -Pattern 'mcr\.microsoft\.com/dotnet/sdk:(\d+)' | Select-Object -First 1
+if ($sdkImage) {
+    $dockerMajor = [int]$sdkImage.Matches[0].Groups[1].Value
+    if ($dockerMajor -eq $dotnetMajor) {
+        Write-Host "Dockerfile usa .NET SDK $dockerMajor.x, compativel com a API (net$dotnetMajor.0). Build sera feito no ACR." -ForegroundColor Green
+    } else {
+        Write-Warning "Dockerfile usa mcr.microsoft.com/dotnet/sdk:$dockerMajor mas a API exige net$dotnetMajor.0. O build no ACR pode falhar com NETSDK1045."
+    }
+} else {
+    Write-Host "Nao achei a imagem mcr.microsoft.com/dotnet/sdk no Dockerfile; seguindo sem validar a versao."
+}
+
+Write-Host "Conferindo login do Azure CLI..."
 az account show --query name -o tsv | Out-Null
-if ($LASTEXITCODE -ne 0) { az login }
+if ($LASTEXITCODE -ne 0) {
+    az login
+    if ($LASTEXITCODE -ne 0) { throw "az login falhou." }
+}
 
 $extension = az extension show --name application-insights --query name -o tsv 2>$null
 if (-not $extension) { Invoke-Az extension add --name application-insights }

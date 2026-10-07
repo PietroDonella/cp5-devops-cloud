@@ -3,6 +3,10 @@
 # Rode na raiz do repositorio.
 #   export SQL_PASSWORD='StellarGear.Cp6.2026'
 #   bash scripts/deploy-azure.sh
+#
+# O script verifica se o .NET SDK exigido pela API esta disponivel. Se nao
+# estiver (caso do Cloud Shell, que vem so com o SDK 9), instala no diretorio
+# do usuario com o dotnet-install.sh oficial, sem precisar de sudo.
 
 set -euo pipefail
 
@@ -11,7 +15,7 @@ if [[ -z "${SQL_PASSWORD:-}" ]]; then
   exit 1
 fi
 
-for tool in git az dotnet zip; do
+for tool in git az zip curl; do
   command -v "$tool" >/dev/null 2>&1 || { echo "'$tool' nao esta no PATH."; exit 1; }
 done
 
@@ -21,6 +25,11 @@ API_BRANCH="${API_BRANCH:-cp6-azure}"
 APP="$REPO/.api"
 PUBLISH="$REPO/publish"
 ZIP="$REPO/stellargear.zip"
+
+# Versao major do .NET exigida. Por padrao e lida do TargetFramework do csproj
+# (net10.0 -> 10); pode ser forcada com DOTNET_MAJOR=10.
+DOTNET_MAJOR="${DOTNET_MAJOR:-}"
+DOTNET_USER_DIR="${DOTNET_USER_DIR:-$HOME/.dotnet}"
 
 SUFFIX="$(date +%d%H%M%S)$RANDOM"
 LOCATION="brazilsouth"
@@ -32,12 +41,79 @@ SQL_DATABASE="StellarGearDb"
 SQL_USER="stellaradmin"
 APPINSIGHTS="appi-stellargear-${SUFFIX}"
 
+# Imprime a primeira versao de SDK instalada com o major pedido (vazio se nao houver).
+installed_sdk_version() {
+  local major="$1"
+  command -v dotnet >/dev/null 2>&1 || return 0
+  dotnet --list-sdks 2>/dev/null | awk '{print $1}' | grep -E "^${major}\." | head -n1 || true
+}
+
+# Retorna 0 se algum SDK instalado (visivel no PATH atual) tem o major pedido.
+has_dotnet_sdk() {
+  [[ -n "$(installed_sdk_version "$1")" ]]
+}
+
+ensure_dotnet_sdk() {
+  local major="$1"
+
+  # Uma instalacao anterior em ~/.dotnet pode existir mas estar fora do PATH
+  # (o Cloud Shell nao persiste o PATH entre sessoes). Coloca na frente para
+  # que tenha prioridade sobre /usr/share/dotnet.
+  if [[ -x "$DOTNET_USER_DIR/dotnet" ]]; then
+    export DOTNET_ROOT="$DOTNET_USER_DIR"
+    export PATH="$DOTNET_USER_DIR:$PATH"
+  fi
+
+  if has_dotnet_sdk "$major"; then
+    echo ".NET SDK ${major}.x ja disponivel ($(installed_sdk_version "$major")). Pulando instalacao."
+    return 0
+  fi
+
+  echo ".NET SDK ${major}.x nao encontrado. SDKs atuais:"
+  dotnet --list-sdks 2>/dev/null || echo "  (dotnet nao esta no PATH)"
+  echo "Instalando .NET SDK ${major}.0 em ${DOTNET_USER_DIR} (sem sudo)..."
+
+  local installer
+  installer="$(mktemp)"
+  curl -fsSL https://dot.net/v1/dotnet-install.sh -o "$installer"
+  bash "$installer" --channel "${major}.0" --install-dir "$DOTNET_USER_DIR"
+  rm -f "$installer"
+
+  export DOTNET_ROOT="$DOTNET_USER_DIR"
+  export PATH="$DOTNET_USER_DIR:$PATH"
+
+  if ! has_dotnet_sdk "$major"; then
+    echo "A instalacao terminou mas 'dotnet --list-sdks' ainda nao mostra ${major}.x."
+    exit 1
+  fi
+
+  echo ".NET SDK instalado: $(installed_sdk_version "$major")"
+
+  # Deixa pronto para as proximas sessoes do Cloud Shell (so adiciona uma vez).
+  if [[ -w "$HOME/.bashrc" ]] && ! grep -q 'DOTNET_ROOT=' "$HOME/.bashrc" 2>/dev/null; then
+    {
+      echo ''
+      echo '# .NET SDK instalado pelo deploy-azure.sh'
+      echo "export DOTNET_ROOT=\"$DOTNET_USER_DIR\""
+      echo 'export PATH="$DOTNET_ROOT:$PATH"'
+    } >> "$HOME/.bashrc"
+  fi
+}
+
 echo "Clonando a API (${API_BRANCH})"
 rm -rf "$APP"
 git clone --branch "$API_BRANCH" --depth 1 "$API_REPO_URL" "$APP"
 
 CSPROJ="$APP/StellarGear.API/StellarGear.API.csproj"
 [[ -f "$CSPROJ" ]] || { echo "Nao achei $CSPROJ no repositorio clonado."; exit 1; }
+
+if [[ -z "$DOTNET_MAJOR" ]]; then
+  DOTNET_MAJOR="$(grep -oE '<TargetFramework>net[0-9]+' "$CSPROJ" | grep -oE '[0-9]+' | head -n1 || true)"
+  DOTNET_MAJOR="${DOTNET_MAJOR:-10}"
+fi
+
+echo "Verificando .NET SDK ${DOTNET_MAJOR}.x"
+ensure_dotnet_sdk "$DOTNET_MAJOR"
 
 az account show --query name -o tsv >/dev/null
 az extension add --name application-insights --only-show-errors || true
@@ -87,7 +163,7 @@ INSIGHTS_CONNECTION="$(az monitor app-insights component show \
   --app "$APPINSIGHTS" \
   --query connectionString -o tsv)"
 
-echo "App Service Linux (.NET 10)"
+echo "App Service Linux (.NET ${DOTNET_MAJOR})"
 az appservice plan create \
   --resource-group "$RESOURCE_GROUP" \
   --name "$PLAN" \
@@ -99,7 +175,7 @@ az webapp create \
   --resource-group "$RESOURCE_GROUP" \
   --plan "$PLAN" \
   --name "$WEBAPP" \
-  --runtime "DOTNETCORE:10.0"
+  --runtime "DOTNETCORE:${DOTNET_MAJOR}.0"
 
 SQL_CONNECTION="Server=tcp:${SQL_SERVER}.database.windows.net,1433;Initial Catalog=${SQL_DATABASE};Persist Security Info=False;User ID=${SQL_USER};Password=${SQL_PASSWORD};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
 
